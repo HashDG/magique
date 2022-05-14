@@ -168,7 +168,7 @@ public class Agent extends AtomicAgent {
      * Add all the methods of the object newSkill to the agent
      *
      *
-     * @param newSkill
+     * @param n
      *           the new skills to be added. Each method of the object newSkill,
      *           is added to the agent.
      *
@@ -278,7 +278,7 @@ public class Agent extends AtomicAgent {
      *
      * @param to
      *           name of recipient (name can be short name)
-     * @param request
+     * @param msg
      *           request to be sent
      * @see java.io.Serializable
      */

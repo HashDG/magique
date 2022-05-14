@@ -11,41 +11,26 @@ package fr.lifl.magique.platform;
 
 import fr.lifl.magique.Message;
 
-/** Specific messages between platforms : a name and a magique message
+/**
+ * Specific messages between platforms : a name and a magique message
  *
- * @see fr.lifl.magique.Message
+ * @see Message
  */
 
-public class PlatformMessage implements Message {
-
-    private final String recipient;
-    private final Message content;
-
-    public PlatformMessage(String recipient, Message content) {
-        this.recipient = recipient;
-        this.content = content;
-    }
+public record PlatformMessage(String recipient, Message content) implements Message {
 
     public String toString() {
         return "to " + recipient + " content " + content;
     }
 
-    public String getRecipient() {
-        return recipient;
-    }
-
-    public Message getContent() {
-        return content;
-    }
-
-//      private void writeObject(ObjectOutputStream output) throws IOException {
-//  	System.out.println("write "+this);	    
+    //      private void writeObject(ObjectOutputStream output) throws IOException {
+//  	System.out.println("write "+this);
 //  	output.defaultWriteObject();
 //      }
 
 //      private void readObject(ObjectInputStream input) throws IOException, ClassNotFoundException {
 //  	try {
-//  	    System.out.println("read "+this);	    
+//  	    System.out.println("read "+this);
 //  	    input.defaultReadObject();
 //  	}
 //  	catch (IOException e) {

@@ -14,6 +14,7 @@ import fr.lifl.magique.platform.PlatformMessage;
 import fr.lifl.magique.policy.ConcurrencyPolicy;
 import fr.lifl.magique.policy.concurrency.DefaultConcurrencyPolicy;
 import fr.lifl.magique.skill.ActionSkill;
+import fr.lifl.magique.skill.MagiqueActionSkill;
 import fr.lifl.magique.skill.MagiqueDefaultSkill;
 import fr.lifl.magique.util.MessageList;
 import fr.lifl.magique.util.Name;
@@ -299,7 +300,7 @@ public class AtomicAgent extends AbstractAgent {
      *               if <tt>newSkill</tt> contains a method with the same
      *               signature as another already known
      *
-     * @see AtomicAgent#addSkill(Skill)
+     * @see AtomicAgent#addSkill(Object skill)
      */
     public void addSkill(String skillClassName, Object[] args) throws SkillAlreadyAcquiredException {
         try {
@@ -470,7 +471,7 @@ public class AtomicAgent extends AbstractAgent {
      *
      * @param to
      *           name of recipient (name can be short name)
-     * @param request
+     * @param msg
      *           request to be sent
      * @see java.io.Serializable
      */
@@ -649,7 +650,7 @@ public class AtomicAgent extends AbstractAgent {
      * starts the agent activity described in <tt>action()</tt> method
      * (something like the <tt>start()</tt> method in thread)
      *
-     * @see fr.lifl.magique.Agent#setAction()
+     * @see fr.lifl.magique.Agent#setAction(MagiqueActionSkill action)
      * @exception NoActionSkillException
      *               if action has not been defined
      */

@@ -13,23 +13,19 @@ import fr.lifl.magique.Agent;
 import fr.lifl.magique.AtomicAgent;
 import fr.lifl.magique.Message;
 import fr.lifl.magique.agent.PlatformAgent;
-import fr.lifl.magique.platform.rmi.Communicate;
-import fr.lifl.magique.platform.rmi.Connect;
-import fr.lifl.magique.platform.rmi.PlatformServer;
+import fr.lifl.magique.platform.communication.PlatformServer;
 import fr.lifl.magique.util.MessageList;
 import fr.lifl.magique.util.Name;
 
 import java.io.*;
-import java.rmi.Naming;
-import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.util.Enumeration;
-import java.util.Hashtable;
+import java.net.InetAddress;
+import java.net.Socket;
+import java.util.*;
 
 /**
  * A platform is used to gather and manage all the agents on a given host.
  * Communications between remote agents is achieved using a communication layer
- * between platform through RMI.
+ * between platform through Sockets.
  *
  * When 2 remote agents try to communicate, the "connection" between their
  * platform is automatically performed.
@@ -49,7 +45,7 @@ public class Platform {
     private String name;
 
     private PlatformServer server;
-    private final Hashtable platformAgenda = new Hashtable();
+    private final HashMap<String, Socket> agenda = new HashMap<>();
     private final Hashtable myAgents = new Hashtable();
 
     private final MessageList messages = new MessageList();
@@ -57,7 +53,7 @@ public class Platform {
 
     private PlatformAgent platformAgent = new PlatformAgent(this);
 
-    // consctuctor
+    // constructor
     /**
      * send a message to the specified platform (via rmi)
      *
@@ -105,8 +101,8 @@ public class Platform {
      *
      * @see fr.lifl.magique.platform.rmi.Communicate
      */
-    public Hashtable getPlatformAgenda() {
-        return platformAgenda;
+    public HashMap<String, Socket> getPlatformAgenda() {
+        return agenda;
     }
 
     /**
@@ -128,9 +124,9 @@ public class Platform {
     }
 
     /**
-     * returns the RMI server asociated with this platform
+     * returns the server associated with this platform
      *
-     * @return the RMI server asociated with this platform
+     * @return the server associated with this platform
      */
     public PlatformServer getServer() {
         return server;
@@ -158,20 +154,14 @@ public class Platform {
     }
 
     /**
-     * initializes the rmi server for this platform. rmi registry is created at
-     * given port
+     * initializes the socket server for this platform.
      *
      */
     private void initServer() {
         try {
-            String hostName = java.net.InetAddress.getLocalHost().getHostAddress();
-            name = hostName + ":" + myPort;
-
-            LocateRegistry.createRegistry(myPort);
-
-            String serverName = "//" + name + "/PlatformServer";
             server = new PlatformServer(this);
-            Naming.rebind(serverName, server);
+            name = InetAddress.getLocalHost().getHostAddress() + ":" + myPort;
+            server.start();
             Agent.verbose(1, "platform " + name + " launched");
         } catch (Exception e) {
             System.out.println("initServer pb : " + e.getMessage());
@@ -346,8 +336,8 @@ public class Platform {
      *           the msg to be treated
      */
     public void treatMessage(PlatformMessage msg) {
-        String recipient = msg.getRecipient();
-        Message content = msg.getContent();
+        String recipient = msg.recipient();
+        Message content = msg.content();
         if (myAgents.containsKey(recipient)) {
             ((AtomicAgent) myAgents.get(recipient)).getToDo().addMessage(content);
         } else {
@@ -370,46 +360,7 @@ public class Platform {
 
     public void sendMessage(String to, Message msg) {
         try {
-            ByteArrayOutputStream baoStream = new ByteArrayOutputStream();
-            ObjectOutputStream ooStream = new ObjectOutputStream(baoStream);
-            ooStream.writeObject(msg);
-            byte[] bytesMsg = baoStream.toByteArray();
-            ((Communicate) platformAgenda.get(to)).haveAMessage(bytesMsg);
-        } catch (InvalidClassException e) {
-            System.out.println("PLATFORM sendMessage ********  invalid");
-            e.printStackTrace();
-        } catch (NotSerializableException e) {
-            System.out.println("PLATFORM sendMessage ********  notserializable");
-            e.printStackTrace();
-        } catch (ClassNotFoundException e) {
-            if (!alreadyTried) {
-                alreadyTried = true;
-                String exceptionMessage = e.getMessage();
-                String className = exceptionMessage.substring(0, exceptionMessage.lastIndexOf('.'));
-                Agent.verbose(2, "**Platform sendMessage : need to give class byte code of " + className + " to " + to);
-                platformAgent.giveClassArchive(className, "a@" + to);
-                sendMessage(to, msg);
-            }
-        } catch (RemoteException e) {
-
-            System.out.println("*\n*\n");
-            System.out.println("PLATFORM sendMessage ********  remoteException" + "\n++++++\n" + msg + "\n++++++\n");
-            e.printStackTrace();
-            System.out.println("*\n*\n");
-
-            System.out.println(" disconnect from " + to);
-            platformAgenda.remove(to);
-            Enumeration agents = myAgents.keys();
-            while (agents.hasMoreElements()) {
-                String agentName = (String) agents.nextElement();
-                if (!Name.getShortName(agentName).equals(PLATFORMMAGIQUEAGENTNAME)) {
-                    ((AtomicAgent) myAgents.get(agentName)).askNow("disconnectFromPlatform", new Object[]{to});
-                }
-            }
-
-            System.out.println(" reconnect from " + to);
-            connect(to);
-            sendMessage(to, msg);
+            server.sendMessage(to, msg);
         } catch (IOException e) {
             System.out.println("PLATFORM sendMessage ********  ioex");
             e.printStackTrace();
@@ -423,14 +374,14 @@ public class Platform {
     }
 
     /**
-     * perform a connection (via rmi) to the given platform
+     * perform a connection (via socket) to the given platform
      *
      * @param platformName
      *           the platform to connect to
      */
     public void connect(String platformName) {
         if (platformName != name) {
-            while (!platformAgenda.containsKey(platformName)) {
+            while (!agenda.containsKey(platformName)) {
                 System.out.println("Platform : connect to " + platformName);
                 server.connect(platformName);
             }
@@ -438,25 +389,26 @@ public class Platform {
     }
 
     /**
-     * disconnect from all otherplatfroms this platform is connected to
+     * disconnect from all other platforms this platform is connected to
      *
      */
     public void disconnectFromAll() {
-        Enumeration p = platformAgenda.keys();
+        Enumeration p = Collections.enumeration(agenda.keySet());
         while (p.hasMoreElements()) {
             disconnectFrom((String) p.nextElement());
         }
     }
 
     /**
-     * disconnects from a given plaform
+     * disconnects from a given platform
      *
      * @param platformName
      *           the platform to disconnect from
      */
     public void disconnectFrom(String platformName) {
+        // nous ne pourrons plus recevoir jusqu'à nouvel ordre de message de cette platform
         try {
-            ((Connect) platformAgenda.get(platformName)).disconnect(name);
+            server.disconnect(platformName);
             System.out.println(name + " disconnected from platform");
             Enumeration agents = myAgents.keys();
             while (agents.hasMoreElements()) {
@@ -472,7 +424,7 @@ public class Platform {
 
     /**
      * stops the platform by killing all agents located on it and stopping it.
-     * Note : the rmiregistry is killed to.
+     * Note : the server is closed
      */
     public void stop() {
         Enumeration agents = myAgents.keys();
@@ -506,7 +458,7 @@ public class Platform {
      * @param platformName
      *           the platform to test
      *
-     * @return <em>Boolean.TRUE</em> iff alive
+     * @return <em>Boolean.TRUE</em> if alive
      */
     public Boolean ping(String platformName) {
         return server.ping(platformName);

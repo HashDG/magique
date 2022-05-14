@@ -50,16 +50,25 @@ public class Name {
         return (st.nextToken());
     }
 
+    /** extract the hostname, name must be of the form
+     *      hostname:PORT
+     * @param name
+     * @return
+     */
+    public static String getPlatformHostname(String name) {
+        StringTokenizer st = new StringTokenizer(name, ":");
+        return st.nextToken();
+    }
+
     /** extract the name of host machine, name must be of the form
-     *       shortname@hostName:PORT
+     *       shortname@hostName:PORT or hostName:PORT
      *
      * @param name the name to be parsed
      * @return the port number
      */
     public static String getPort(String name) {
-        StringTokenizer st = new StringTokenizer(name, "@:");
+        StringTokenizer st = new StringTokenizer(name, ":");
         // to skip the short name and the host name
-        st.nextToken();
         st.nextToken();
         return (st.nextToken());
     }

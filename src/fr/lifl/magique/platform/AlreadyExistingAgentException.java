@@ -11,10 +11,7 @@ package fr.lifl.magique.platform;
 
 public class AlreadyExistingAgentException extends RuntimeException {
 
-    private String message;
-
     public AlreadyExistingAgentException(String agentName) {
-        message = agentName;
         System.err.println("Already existing Agent : " + agentName);
     }
 
