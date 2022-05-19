@@ -20,6 +20,7 @@ import fr.lifl.magique.util.MessageList;
 import fr.lifl.magique.util.Name;
 import fr.lifl.magique.util.QuestionTable;
 
+import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;

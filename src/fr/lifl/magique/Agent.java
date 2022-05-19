@@ -14,6 +14,7 @@ import fr.lifl.magique.util.MessageList;
 import fr.lifl.magique.util.Name;
 import fr.lifl.magique.util.Team;
 
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.InetAddress;

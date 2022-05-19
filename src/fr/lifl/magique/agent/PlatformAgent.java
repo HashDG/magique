@@ -15,13 +15,15 @@ import fr.lifl.magique.platform.Platform;
 import fr.lifl.magique.platform.classloader.BytecodeClassLoader;
 import fr.lifl.magique.platform.classloader.ClassArchive;
 
+import static fr.lifl.magique.platform.Platform.PLATFORMMAGIQUEAGENTNAME;
+
 public class PlatformAgent extends AtomicAgent {
 
     private final BytecodeClassLoader myLoader;
     private final Platform platform;
 
     public PlatformAgent(Platform platform) {
-        super(fr.lifl.magique.platform.Platform.PLATFORMMAGIQUEAGENTNAME);
+        super(PLATFORMMAGIQUEAGENTNAME);
         this.platform = platform;
         myLoader = (BytecodeClassLoader) this.getClass().getClassLoader();
     }
@@ -41,7 +43,7 @@ public class PlatformAgent extends AtomicAgent {
         if (myLoader.knownClassArchive(className.replace('/', '.'))) {
             classArchive = myLoader.getClassArchive(className.replace('/', '.'));
         }
-        String otherName = fr.lifl.magique.platform.Platform.PLATFORMMAGIQUEAGENTNAME + "@" + fr.lifl.magique.util.Name.noShortName(to);
+        String otherName = PLATFORMMAGIQUEAGENTNAME + "@" + fr.lifl.magique.util.Name.noShortName(to);
         if (!getAgenda().containsKey(otherName)) {
             connectTo(otherName);
         }
@@ -91,8 +93,8 @@ public class PlatformAgent extends AtomicAgent {
      * @return the full name of the created agent
      */
     public String createDistantAgent(String agentName, String platformName) {
-        connectTo(Platform.PLATFORMMAGIQUEAGENTNAME + "@" + platformName);
-        return (String) askNow(Platform.PLATFORMMAGIQUEAGENTNAME + "@" + platformName, "createAgent", agentName);
+        connectTo(PLATFORMMAGIQUEAGENTNAME + "@" + platformName);
+        return (String) askNow(PLATFORMMAGIQUEAGENTNAME + "@" + platformName, "createAgent", agentName);
     }
 
     /**
@@ -107,9 +109,9 @@ public class PlatformAgent extends AtomicAgent {
      * @return the full name of the created agent
      */
     public String createDistantAgentAndConnectToBoss(String agentName, String platformName, String boss) {
-        connectTo(Platform.PLATFORMMAGIQUEAGENTNAME + "@" + platformName);
-        String agName = (String) askNow(Platform.PLATFORMMAGIQUEAGENTNAME + "@" + platformName, "createAgent", agentName);
-        perform(Platform.PLATFORMMAGIQUEAGENTNAME + "@" + platformName, "connectAgentToBoss", agName, boss);
+        connectTo(PLATFORMMAGIQUEAGENTNAME + "@" + platformName);
+        String agName = (String) askNow(PLATFORMMAGIQUEAGENTNAME + "@" + platformName, "createAgent", agentName);
+        perform(PLATFORMMAGIQUEAGENTNAME + "@" + platformName, "connectAgentToBoss", agName, boss);
         return agName;
     }
 

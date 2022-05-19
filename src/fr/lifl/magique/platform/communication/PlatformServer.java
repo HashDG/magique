@@ -14,6 +14,7 @@ import fr.lifl.magique.platform.Platform;
 import fr.lifl.magique.util.Name;
 
 import java.io.*;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashMap;
@@ -22,13 +23,18 @@ import java.util.HashMap;
  * The server thread for gathering messages from other platforms. It will start a thread per platform connection and
  * enable the sending of messages to other platform through the sendingMessage method.
  *
- * @see fr.lifl.magique.platform.communication.ConnectionHandler
+ * @see ConnectionInputHandler
  */
 public class PlatformServer extends Thread implements Closeable {
-
     private final Platform platform;
     private ServerSocket server;
-    private HashMap<String, Socket> agenda;
+    /*
+    garder en mémoire le nom de la plateforme et le socket de communication déjà ouvert
+     */
+    private HashMap<String, ConnectionOutputHandler> agenda;
+    /*
+    réutiliser les outputStream pour éviter les désynchronisations
+     */
     private HashMap<Socket, ObjectOutputStream> outputStreams;
 
     /** @param platform the platform i am the server of
@@ -43,20 +49,25 @@ public class PlatformServer extends Thread implements Closeable {
     public void run() {
         try {
             server = new ServerSocket(platform.getPort());
+            System.out.println("Server launched IP : " + InetAddress.getLocalHost().getHostAddress() + ":" + platform.getPort());
             while (true) {
                 Socket connection = server.accept();
-                ConnectionHandler handler = new ConnectionHandler(connection, this);
-                agenda.put(connection.getInetAddress().getHostAddress() + ":" + connection.getLocalPort(), connection);
-                outputStreams.put(connection, new ObjectOutputStream(connection.getOutputStream()));
+                ConnectionInputHandler handler = new ConnectionInputHandler(connection, this);
                 handler.start();
             }
         } catch (IOException e) {
+            System.out.println("I STOPPED RUNNING MY SERVER");
             e.printStackTrace();
         }
     }
 
+    public Platform getPlatform() {
+        return platform;
+    }
+
     @Override
     public void close() throws IOException {
+        System.out.println("I CLOSED MY SERVER");
         server.close();
     }
 
@@ -71,18 +82,38 @@ public class PlatformServer extends Thread implements Closeable {
         platform.haveAMessage(message);
     }
 
+    /**
+     * the platform received from another platform its infos (hostname/port) for stocking in agenda
+     */
+    public void haveAInfoMessage(PlatformInfoMessage msg) throws IOException {
+        String receiver = msg.recipient();
+        // is the message addressed to me ?
+        if (receiver.equals(platform.getName())) {
+            PlatformInfo info = msg.platformInfo();
+            String hostname = info.hostname();
+            int port = info.port();
+
+            // si cette plateforme ne connais pas la plateforme qui lui envoie le message, il initie un agenda avec
+            // socket enregistré pour une communication future il stocke aussi un nouvel oos
+
+            if (!agenda.containsKey(hostname)) {
+                ConnectionOutputHandler handler = new ConnectionOutputHandler(hostname, port, this);
+                agenda.put(hostname, handler);
+            }
+        }
+    }
+
     public void sendMessage(String destination, Message message) throws IOException {
         if (agenda.containsKey(destination)) {
-            Socket socket = agenda.get(destination);
-            ObjectOutputStream output;
-
-            if (outputStreams.containsKey(socket)) {
-                output = outputStreams.get(socket);
-            } else {
-                output = new ObjectOutputStream(socket.getOutputStream());
+            ConnectionOutputHandler outputHandler = agenda.get(destination);
+            if (!outputHandler.isConnected()) {
+                outputHandler.connect();
             }
-            output.writeObject(message);
-            output.flush();
+
+            outputHandler.addMessage(message);
+        } else {
+            connect(destination);
+            sendMessage(destination, message);
         }
     }
 
@@ -115,22 +146,21 @@ public class PlatformServer extends Thread implements Closeable {
             System.out.println(platformName + " already known");
         } else {
             System.out.println(platformName + " not yet known");
-            boolean connected = false;
-            while (!connected) {
-                try {
-                    String hostname = Name.getPlatformHostname(platformName);
-                    int port = Integer.parseInt(Name.getPort(platformName));
+            try {
+                String hostname = Name.getPlatformHostname(platformName);
+                int port = Integer.parseInt(Name.getPort(platformName));
 
-                    Socket socket = new Socket(hostname, port);
 
-                    agenda.put(platformName, socket);
-                    outputStreams.put(socket, new ObjectOutputStream(socket.getOutputStream()));
-                    connected = true;
-                    System.out.println("connection with " + platformName + " performed");
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    connected = false;
-                }
+
+                // send a message to introduce my platform to the remote one
+                ConnectionOutputHandler handler = new ConnectionOutputHandler(hostname, port, this).connect();
+                handler.start();
+
+                // stocker la platform distante dans mon agenda
+                agenda.put(platformName, handler);
+                System.out.println("connection with " + platformName + " performed");
+            } catch (Exception e) {
+                e.printStackTrace();
             }
         }
     }
@@ -140,10 +170,10 @@ public class PlatformServer extends Thread implements Closeable {
     public void disconnect(String platformName) {
         try {
             System.out.println(platform.getName() + " disconnect from " + platformName);
-            Socket socket = agenda.get(platformName);
+            ConnectionOutputHandler connection = agenda.get(platformName);
+
             agenda.remove(platformName);
-            outputStreams.remove(socket);
-            socket.close();
+            connection.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -12,7 +12,11 @@ package fr.lifl.magique.platform;
 import fr.lifl.magique.Agent;
 import fr.lifl.magique.AtomicAgent;
 import fr.lifl.magique.Message;
+import fr.lifl.magique.Request;
 import fr.lifl.magique.agent.PlatformAgent;
+import fr.lifl.magique.platform.communication.ConnectionOutputHandler;
+import fr.lifl.magique.platform.communication.PlatformInfo;
+import fr.lifl.magique.platform.communication.PlatformInfoMessage;
 import fr.lifl.magique.platform.communication.PlatformServer;
 import fr.lifl.magique.util.MessageList;
 import fr.lifl.magique.util.Name;
@@ -26,13 +30,13 @@ import java.util.*;
  * A platform is used to gather and manage all the agents on a given host.
  * Communications between remote agents is achieved using a communication layer
  * between platform through Sockets.
- *
+ * <p>
  * When 2 remote agents try to communicate, the "connection" between their
  * platform is automatically performed.
- *
+ * <p>
  * Registry is automatically launched and port 4444 is the default registry
  * port.
- *
+ * <p>
  * Agent must be added to the platform using <tt>addAgent</tt>
  */
 
@@ -45,7 +49,7 @@ public class Platform {
     private String name;
 
     private PlatformServer server;
-    private final HashMap<String, Socket> agenda = new HashMap<>();
+    private final HashMap<String, ConnectionOutputHandler> agenda = new HashMap<>();
     private final Hashtable myAgents = new Hashtable();
 
     private final MessageList messages = new MessageList();
@@ -58,9 +62,9 @@ public class Platform {
      * send a message to the specified platform (via rmi)
      *
      * @param to
-     *           the recipient platform
+     * the recipient platform
      * @param msg
-     *           the message
+     * the message
      */
     private boolean alreadyTried = false;
 
@@ -72,8 +76,7 @@ public class Platform {
     }
 
     /**
-     * @param port
-     *           the port for the server associated with this platform
+     * @param port the port for the server associated with this platform
      */
     public Platform(int port) {
         myPort = port;
@@ -86,8 +89,7 @@ public class Platform {
     // access to private member
 
     /**
-     * @param port
-     *           the port for the server associated with this platform
+     * @param port the port for the server associated with this platform
      */
     public Platform(Integer port) {
         this(port.intValue());
@@ -98,10 +100,9 @@ public class Platform {
      * with the corresponding Communicate rmi interface implementation
      *
      * @return the agenda of the platform,
-     *
      * @see fr.lifl.magique.platform.rmi.Communicate
      */
-    public HashMap<String, Socket> getPlatformAgenda() {
+    public HashMap<String, ConnectionOutputHandler> getPlatformAgenda() {
         return agenda;
     }
 
@@ -137,7 +138,6 @@ public class Platform {
      * an agent name with the corresponding Agent object
      *
      * @return the hashtable of the agents active in the platform
-     *
      * @see fr.lifl.magique.Agent
      */
     public Hashtable getMyAgents() {
@@ -155,7 +155,6 @@ public class Platform {
 
     /**
      * initializes the socket server for this platform.
-     *
      */
     private void initServer() {
         try {
@@ -171,7 +170,6 @@ public class Platform {
 
     /**
      * creates and initializes the plaform agent
-     *
      */
     private PlatformAgent createPlatformAgent() {
         platformAgent = new PlatformAgent(this);
@@ -195,8 +193,7 @@ public class Platform {
     /**
      * the given agent is added to the platform
      *
-     * @param agent
-     *           the agent to be added
+     * @param agent the agent to be added
      */
     public void addAgent(AtomicAgent agent) throws AlreadyExistingAgentException {
         String trueName = fr.lifl.magique.util.Name.getShortName(agent.getName()) + "@" + name;
@@ -218,9 +215,7 @@ public class Platform {
      * dynamically creates a magique agent (class fr.lifl.magique.Agent). Agent
      * is added to the platform
      *
-     * @param agentName
-     *           the name of the created agent
-     *
+     * @param agentName the name of the created agent
      * @result the created agent (an <tt>fr.lifl.magique.Agent</tt>)
      */
     public Agent createAgent(String agentName) throws AlreadyExistingAgentException {
@@ -231,11 +226,8 @@ public class Platform {
      * dynamically creates an agent from its class an name. Agent is added to the
      * platform
      *
-     * @param agentClassName
-     *           the class of the to be created agent
-     * @param agentName
-     *           the name of the crated agent
-     *
+     * @param agentClassName the class of the to be created agent
+     * @param agentName      the name of the crated agent
      * @result the created agent (an <tt>AtomicAgent</tt>)
      */
     public AtomicAgent createAgent(String agentClassName, String agentName) throws AlreadyExistingAgentException {
@@ -267,20 +259,16 @@ public class Platform {
      * dynamically creates an agent from its class an name. Agent is added to the
      * platform
      *
-     * @param agentClassName
-     *           the class of the to be created agent
-     * @param agentName
-     *           the name of the crated agent
-     * @param args
-     *           the arguments for the constructor of the agent
-     *
+     * @param agentClassName the class of the to be created agent
+     * @param agentName      the name of the crated agent
+     * @param args           the arguments for the constructor of the agent
      * @result the created agent (an <tt>AtomicAgent</tt>)
      */
     public AtomicAgent createAgent(String agentClassName, String agentName, Object[] args) throws AlreadyExistingAgentException {
 
         AtomicAgent agent = null;
 
-        String trueName = fr.lifl.magique.util.Name.getShortName(agentName) + "@" + name;
+        String trueName = Name.getShortName(agentName) + "@" + name;
         if (myAgents.contains(trueName)) {
             throw new AlreadyExistingAgentException(trueName);
         }
@@ -319,8 +307,7 @@ public class Platform {
     /**
      * given agent is removed from platform
      *
-     * @param agentName
-     *           the name of the agent to be removed
+     * @param agentName the name of the agent to be removed
      */
     public void removeAgent(String agentName) {
         Agent.verbose(2, agentName + " has leaved the platform");
@@ -332,14 +319,16 @@ public class Platform {
      * this platform, or send (after connection if required) to the platform who
      * contains the recipient
      *
-     * @param msg
-     *           the msg to be treated
+     * @param msg the msg to be treated
      */
     public void treatMessage(PlatformMessage msg) {
         String recipient = msg.recipient();
         Message content = msg.content();
-        if (myAgents.containsKey(recipient)) {
+
+        if (myAgents.containsKey(recipient)) { // the message is addressed to one of the platform's agents
             ((AtomicAgent) myAgents.get(recipient)).getToDo().addMessage(content);
+        } else if (recipient == name) {
+            return;
         } else {
             // send platform to other platform and "connect" to it not
             // already done
@@ -349,10 +338,9 @@ public class Platform {
     }
 
     /**
-     * used when a message is sent by anther platform
+     * used when a message is sent by another platform
      *
-     * @param msg
-     *           the sent message
+     * @param msg the sent message
      */
     public void haveAMessage(Message msg) {
         messages.addMessage(msg);
@@ -376,12 +364,11 @@ public class Platform {
     /**
      * perform a connection (via socket) to the given platform
      *
-     * @param platformName
-     *           the platform to connect to
+     * @param platformName the platform to connect to
      */
     public void connect(String platformName) {
         if (platformName != name) {
-            while (!agenda.containsKey(platformName)) {
+            if (!agenda.containsKey(platformName)) {
                 System.out.println("Platform : connect to " + platformName);
                 server.connect(platformName);
             }
@@ -390,7 +377,6 @@ public class Platform {
 
     /**
      * disconnect from all other platforms this platform is connected to
-     *
      */
     public void disconnectFromAll() {
         Enumeration p = Collections.enumeration(agenda.keySet());
@@ -402,8 +388,7 @@ public class Platform {
     /**
      * disconnects from a given platform
      *
-     * @param platformName
-     *           the platform to disconnect from
+     * @param platformName the platform to disconnect from
      */
     public void disconnectFrom(String platformName) {
         // nous ne pourrons plus recevoir jusqu'à nouvel ordre de message de cette platform
@@ -455,9 +440,7 @@ public class Platform {
     /**
      * test if the platform <em>hostname</em> is alive
      *
-     * @param platformName
-     *           the platform to test
-     *
+     * @param platformName the platform to test
      * @return <em>Boolean.TRUE</em> if alive
      */
     public Boolean ping(String platformName) {

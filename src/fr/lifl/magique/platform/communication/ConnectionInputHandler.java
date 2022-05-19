@@ -1,7 +1,7 @@
 package fr.lifl.magique.platform.communication;
 
-import fr.lifl.magique.Agent;
 import fr.lifl.magique.Message;
+import fr.lifl.magique.platform.PlatformMessage;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -12,15 +12,16 @@ import java.net.Socket;
  * The thread for managing connection from an external platform to the platform. All the messages received are pulled up
  * to the PlatformServer with the PlatformServer#haveAMessage(Message) method.
  *
+ * Manage incoming messages
  * @see fr.lifl.magique.platform.communication.PlatformServer
  */
-public class ConnectionHandler extends Thread implements Closeable {
+public class ConnectionInputHandler extends Thread implements Closeable {
 
     private Socket socket;
     private ObjectInputStream input;
     private PlatformServer platformServer;
 
-    public ConnectionHandler(Socket socket, PlatformServer platformServer) throws IOException {
+    public ConnectionInputHandler(Socket socket, PlatformServer platformServer) throws IOException {
         this.socket = socket;
         this.input = new ObjectInputStream(socket.getInputStream());
         this.platformServer = platformServer;
@@ -30,7 +31,14 @@ public class ConnectionHandler extends Thread implements Closeable {
     public void run() {
         try {
             while (socket.isConnected() && !socket.isClosed() && !socket.isInputShutdown()) {
-                platformServer.haveAMessage((Message) input.readObject());
+                Object received = input.readObject();
+                if (received instanceof PlatformMessage) {
+                    platformServer.haveAMessage((Message) received);
+                } else if (received instanceof PlatformInfoMessage) {
+                    platformServer.haveAInfoMessage((PlatformInfoMessage) received);
+                } else {
+                    System.err.println("Unreadable message :" + received.getClass().getName() + " > " + received);
+                }
             }
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();

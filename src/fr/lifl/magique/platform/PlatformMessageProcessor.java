@@ -10,11 +10,12 @@
 package fr.lifl.magique.platform;
 
 
-/** this is simply use to treat a given PlatformMessage in a thread. Each
+/**
+ * this is simply use to treat a given PlatformMessage in a thread. Each
  * PlatformMessage is run in a separate thread which is instantiated by siuch
  * an object.
  *
- * @see java.lang.Runnable
+ * @see Runnable
  */
 public class PlatformMessageProcessor implements Runnable {
 
@@ -24,7 +25,7 @@ public class PlatformMessageProcessor implements Runnable {
     private final PlatformMessage platformMessage;
 
     /**
-     * @param agent the object that must execute platformMessage
+     * @param platform           the object that must execute platformMessage
      * @param platformMessage the platformMessage to execute
      */
     public PlatformMessageProcessor(Platform platform, PlatformMessage platformMessage) {
@@ -32,9 +33,10 @@ public class PlatformMessageProcessor implements Runnable {
         this.platformMessage = platformMessage;
     }
 
-    /** treats the PlatformMessage */
+    /**
+     * treats the PlatformMessage
+     */
     public void run() {
         platform.treatMessage(platformMessage);
     }
-
 } // RequestProcessor
